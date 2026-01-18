@@ -1,0 +1,120 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum AuthType {
+  NONE
+  API_KEY
+  BEARER
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      UserRole @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  connectors Connector[]
+  syncJobs    SyncJob[]
+
+  @@index([email])
+}
+
+model Connector {
+  id                String    @id @default(uuid())
+  name              String
+  baseUrl           String
+  authType          AuthType  @default(NONE)
+  authConfig        Json      // { apiKey?: string, bearerToken?: string, headers?: object }
+  rateLimitConfig   Json      // { requestsPerSecond?: number, requestsPerMinute?: number }
+  endpointConfig    Json      // [{ path: string, method: string }]
+  fieldMappingConfig Json     // { mappings: [{ source: string, target: string, type: string }] }
+  isShared          Boolean   @default(false)
+  userId            String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  syncJobs       SyncJob[]
+  normalizedData NormalizedData[]
+
+  @@index([userId])
+  @@index([isShared])
+}
+
+
+model SyncJob {
+  id          String    @id @default(uuid())
+  connectorId String
+  status      JobStatus @default(PENDING)
+  startedAt   DateTime?
+  completedAt DateTime?
+  logs        Json      // [{ timestamp: DateTime, level: string, message: string }]
+  error       String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  connector    Connector     @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  rawApiData   RawApiData[]
+  normalizedData NormalizedData[]
+
+  @@index([connectorId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model RawApiData {
+  id        String   @id @default(uuid())
+  syncJobId String
+  endpoint  String
+  response  Json
+  createdAt DateTime @default(now())
+
+  syncJob SyncJob @relation(fields: [syncJobId], references: [id], onDelete: Cascade)
+
+  @@index([syncJobId])
+  @@index([createdAt])
+}
+
+model NormalizedData {
+  id          String   @id @default(uuid())
+  syncJobId   String
+  connectorId String
+  entityKey   String   // Indexed identifier/symbol/externalId for queryable SQL operations
+  data        Json     // Key-value pairs of normalized data
+  metadata    Json     // Connector-specific schema info
+  createdAt   DateTime @default(now())
+
+  syncJob  SyncJob  @relation(fields: [syncJobId], references: [id], onDelete: Cascade)
+  connector Connector @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+
+  @@index([syncJobId])
+  @@index([connectorId])
+  @@index([entityKey])
+  @@index([createdAt])
+}
