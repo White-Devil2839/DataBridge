@@ -1,7 +1,21 @@
-node_modules
+# Common
+node_modules/
 .env
-dist
-build
+.env.local
 .DS_Store
-.gemini
+*.log
+dist/
+build/
+.gemini/
+coverage/
 
+# Backend
+backend/.env
+backend/node_modules/
+backend/dist/
+
+# Frontend
+frontend/.env
+frontend/node_modules/
+frontend/dist/
+frontend/build/
